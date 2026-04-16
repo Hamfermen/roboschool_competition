@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -31,7 +30,7 @@ class CubeDetector(Node):
         self.declare_parameter("target_frame", "map")
         self.declare_parameter(
             "allowed_labels",
-            ["chair", "bottle", "tv", "tvmonitor", "potted plant", "book"],
+            ["chair", "bottle", "cup", "laptop", "backpack"],
         )
 
         image_qos = QoSProfile(
@@ -224,3 +223,16 @@ class CubeDetector(Node):
                 mk.text = "%s_%d" % (label, idx)
                 out.markers.append(mk)
         return out
+
+
+def main(args=None):
+    try:
+        with rclpy.init(args=args):
+            cube_detector = CubeDetector()
+            rclpy.spin(cube_detector)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+
+
+if __name__ == "__main__":
+    main()

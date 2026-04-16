@@ -148,3 +148,16 @@ class CubeDatabase(Node):
                 min_idx = idx
         if min_idx is not None and min_dist <= 0.6:
             self.visited[(label, min_idx)] = True
+
+
+def main(args=None):
+    try:
+        with rclpy.init(args=args):
+            cube_database = CubeDatabase()
+            rclpy.spin(cube_database)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+
+
+if __name__ == "__main__":
+    main()
