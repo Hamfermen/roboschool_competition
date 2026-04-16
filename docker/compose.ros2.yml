@@ -14,7 +14,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all,compute,utility,graphics
       - QT_X11_NO_MITSHM=1
       - LIBGL_DRI3_DISABLE=1
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-52}
 
     stdin_open: true
     tty: true
