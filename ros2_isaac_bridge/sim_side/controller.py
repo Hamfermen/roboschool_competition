@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 import math
+from pathlib import Path
 import random
 from typing import Dict, List, Optional
 
 import numpy as np
 import rclpy
 from rclpy.node import Node
+
+try:
+    import cv2
+except Exception:
+    cv2 = None
 
 from geometry_msgs.msg import Twist, TwistStamped
 from sensor_msgs.msg import Image, Imu, JointState
@@ -97,6 +103,25 @@ class HLInterfaceController(Node):
             "encoding": None,
             "stamp_sec": None,
         }
+
+        # ---------------- RGB saving ----------------
+        self.save_rgb_enabled = True
+        self.rgb_save_every_n = 40
+        self.rgb_frame_counter = 0
+        self.rgb_saved_counter = 0
+        self.rgb_save_dir = Path(__file__).resolve().parent / "rgb_frames"
+        self._cv2 = cv2
+
+        if self.save_rgb_enabled and self._cv2 is None:
+            self.save_rgb_enabled = False
+            self.get_logger().warning(
+                "RGB save disabled: OpenCV (cv2) is not available."
+            )
+        elif self.save_rgb_enabled:
+            self.rgb_save_dir.mkdir(parents=True, exist_ok=True)
+            self.get_logger().info(
+                f"RGB frames will be saved to: {self.rgb_save_dir}"
+            )
 
         # ---------------- Demo behavior ----------------
         self.command_duration = 2.0
@@ -262,6 +287,32 @@ class HLInterfaceController(Node):
             "encoding": msg.encoding,
             "stamp_sec": self._msg_time_to_sec(msg.header.stamp),
         }
+
+        self.rgb_frame_counter += 1
+        if not self.save_rgb_enabled:
+            return
+        if self.rgb_frame_counter % max(int(self.rgb_save_every_n), 1) != 0:
+            return
+
+        image_to_save = image
+        if msg.encoding == "rgb8":
+            image_to_save = image[..., ::-1]
+
+        file_name = (
+            f"rgb_{msg.header.stamp.sec}_{msg.header.stamp.nanosec:09d}_"
+            f"{self.rgb_frame_counter:06d}.png"
+        )
+        out_path = self.rgb_save_dir / file_name
+        cv2_mod = self._cv2
+        if cv2_mod is None:
+            return
+        saved_ok = cv2_mod.imwrite(str(out_path), image_to_save)
+        if saved_ok:
+            self.rgb_saved_counter += 1
+        elif self.rgb_saved_counter == 0:
+            self.get_logger().warning(
+                "Failed to save RGB frame. Check write permissions and path."
+            )
 
     def _depth_callback(self, msg: Image) -> None:
         try:
