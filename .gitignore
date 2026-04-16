@@ -7,7 +7,7 @@ logs/
 tmp/
 models/*
 !models/.gitkeep
-<<<<<<< Updated upstream
 .codex
-=======
->>>>>>> Stashed changes
+**log
+**build
+**install
