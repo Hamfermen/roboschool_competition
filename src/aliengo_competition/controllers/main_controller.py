@@ -106,12 +106,112 @@ class _CameraRenderer:
         self._active = False
 
 
+class _ImageSaver:
+    def __init__(self, enabled: bool, output_dir: str = "camera_frames"):
+        self.enabled = bool(enabled)
+        self.output_dir = str(output_dir)
+        self._cv2 = None
+        self._frame_count = 0
+        if not self.enabled:
+            return
+        try:
+            import cv2
+            import os
+        except Exception as exc:
+            print(f"Сохранение изображений отключено: не удалось импортировать модули ({exc})")
+            self.enabled = False
+            return
+        self._cv2 = cv2
+        try:
+            os.makedirs(self.output_dir, exist_ok=True)
+            print(f"Изображения будут сохраняться в: {os.path.abspath(self.output_dir)}")
+        except Exception as exc:
+            print(f"Ошибка при создании директории {self.output_dir}: {exc}")
+            self.enabled = False
+
+    def save(self, camera: CameraState, step_index: int = None) -> None:
+        if not self.enabled or self._cv2 is None or not isinstance(camera, CameraState):
+            return
+        
+        image = camera.rgb
+        if image is None:
+            return
+
+        try:
+            import os
+            rgb = np.asarray(image)
+            if rgb.ndim != 3 or rgb.shape[2] < 3:
+                return
+            if rgb.dtype != np.uint8:
+                rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+            rgb = rgb[..., :3]
+            # Конвертируем RGB в BGR для cv2.imwrite
+            rgb_bgr = self._cv2.cvtColor(rgb, self._cv2.COLOR_RGB2BGR)
+            
+            # Генерируем имя файла
+            if step_index is not None:
+                filename = f"frame_{step_index:06d}.png"
+            else:
+                filename = f"frame_{self._frame_count:06d}.png"
+                self._frame_count += 1
+            
+            filepath = os.path.join(self.output_dir, filename)
+            success = self._cv2.imwrite(filepath, rgb_bgr)
+            if not success:
+                print(f"[ImageSaver] Не удалось сохранить изображение: {filepath}")
+        except Exception as exc:
+            print(f"[ImageSaver] Ошибка при сохранении изображения: {exc}")
+
+    def save_depth(self, camera: CameraState, step_index: int = None) -> None:
+        """Сохранить карту глубины в виде изображения."""
+        if not self.enabled or self._cv2 is None or not isinstance(camera, CameraState):
+            return
+        
+        depth = camera.depth
+        if depth is None:
+            return
+
+        try:
+            import os
+            depth_m = np.asarray(depth, dtype=np.float32)
+            if depth_m.ndim != 2:
+                return
+            
+            # Нормализуем и конвертируем в 8-bit для сохранения
+            depth_max_m = 4.0
+            depth_m = np.nan_to_num(depth_m, nan=0.0, posinf=depth_max_m, neginf=0.0)
+            depth_m = np.clip(depth_m, 0.0, depth_max_m)
+            depth_u8 = (depth_m * (255.0 / depth_max_m)).astype(np.uint8)
+            
+            # Применяем цветовую карту для лучшей визуализации
+            depth_color = self._cv2.applyColorMap(depth_u8, self._cv2.COLORMAP_TURBO)
+            
+            # Генерируем имя файла
+            if step_index is not None:
+                filename = f"depth_{step_index:06d}.png"
+            else:
+                filename = f"depth_{self._frame_count:06d}.png"
+            
+            filepath = os.path.join(self.output_dir, filename)
+            success = self._cv2.imwrite(filepath, depth_color)
+            if not success:
+                print(f"[ImageSaver] Не удалось сохранить карту глубины: {filepath}")
+        except Exception as exc:
+            print(f"[ImageSaver] Ошибка при сохранении карты глубины: {exc}")
+
+    def close(self) -> None:
+        if self.enabled:
+            print(f"[ImageSaver] Сохранено {self._frame_count} изображений")
+
+
 def run(
     robot: AliengoRobotInterface,
     steps: int = 15000,
     render_camera: bool = False,
     camera_depth_max_m: float = 4.0,
     seed: int = 0,
+    save_camera_frames: bool = False,
+    camera_frames_dir: str = "camera_frames",
 ) -> None:
     robot.reset()
     env = getattr(robot, "env", None)
@@ -123,6 +223,9 @@ def run(
     logger = CompetitionRunLogger(env=env, seed=int(seed))
     camera_renderer = _CameraRenderer(
         enabled=render_camera, depth_max_m=camera_depth_max_m
+    )
+    image_saver = _ImageSaver(
+        enabled=save_camera_frames, output_dir=camera_frames_dir
     )
     control_dt = _infer_control_dt(robot, fallback_dt=0.02)
     requested_steps = max(int(steps), 1)
@@ -220,6 +323,7 @@ def run(
             ) and isinstance(camera_payload, CameraState):
                 camera_state = camera_payload
             camera_renderer.show(camera_state)
+            image_saver.save(camera_state, step_index=step_index)
             omega_z = state.imu.wz / ang_vel_scale
 
             # ================= USER CONTROL LOGIC START =================
@@ -332,4 +436,5 @@ def run(
     finally:
         logger.close()
         camera_renderer.close()
+        image_saver.close()
         robot.stop()
