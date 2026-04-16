@@ -16,6 +16,8 @@ RUN set -eux; \
             ros-jazzy-image-transport-plugins \
             ros-jazzy-rqt \
             ros-jazzy-rqt-common-plugins \
+            ros-jazzy-navigation2 ros-jazzy-robot-localization \
+
         && success=1 && break; \
         echo "apt install attempt ${attempt} failed; retrying..." >&2; \
         rm -rf /var/lib/apt/lists/*; \
