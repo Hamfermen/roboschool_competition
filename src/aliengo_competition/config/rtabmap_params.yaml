@@ -1,0 +1,67 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+
+    # Sync behavior: Isaac Gym bridges sometimes have slight timestamp offsets.
+    # Approx sync improves robustness while still preserving RGB-D pairing quality.
+    approx_sync: true
+    queue_size: 30
+    sync_queue_size: 30
+    qos_sensor_data: 2
+
+    frame_id: base_link
+    odom_frame_id: odom
+    map_frame_id: map
+    subscribe_rgbd: false
+    subscribe_depth: true
+    subscribe_rgb: true
+    subscribe_scan: false
+    subscribe_scan_cloud: false
+    subscribe_odom_info: true
+    wait_imu_to_init: true
+
+    # For flat-floor quadruped navigation, keep SLAM constrained to 3DoF.
+    Reg/Force3DoF: "true"
+    RGBD/OptimizeSlam2d: "true"
+
+    # Odometry: robust visual odometry defaults for moderate robot motion.
+    Vis/MinInliers: "15"
+    Vis/InlierDistance: "0.08"
+    Vis/MaxDepth: "6.0"
+    Odom/ResetCountdown: "0"
+    OdomF2M/MaxSize: "2000"
+    OdomF2M/BundleAdjustment: "1"
+    Odom/FillInfoData: "true"
+
+    # Loop closure and graph optimization tuned for indoor-like flat maps.
+    RGBD/ProximityBySpace: "true"
+    RGBD/ProximityPathMaxNeighbors: "5"
+    RGBD/NeighborLinkRefining: "true"
+    RGBD/AngularUpdate: "0.02"
+    RGBD/LinearUpdate: "0.02"
+    RGBD/PlanStuckIterations: "20"
+    RGBD/OptimizeFromGraphEnd: "false"
+    Mem/RehearsalSimilarity: "0.45"
+    Mem/NotLinkedNodesKept: "false"
+    Rtabmap/DetectionRate: "10.0"
+    Rtabmap/TimeThr: "0"
+    Rtabmap/PublishStats: "true"
+
+    # Occupancy projection to 2D map.
+    Grid/FromDepth: "true"
+    Grid/3D: "false"
+    Grid/RayTracing: "true"
+    Grid/RangeMax: "7.0"
+    Grid/CellSize: "0.05"
+    Grid/DepthDecimation: "2"
+    Grid/NormalsSegmentation: "false"
+    Grid/FootprintLength: "0.7"
+    Grid/FootprintWidth: "0.35"
+    Grid/NoiseFilteringRadius: "0.05"
+    Grid/NoiseFilteringMinNeighbors: "5"
+    Grid/MinGroundHeight: "-0.10"
+    Grid/MaxGroundHeight: "0.15"
+    Grid/FlatObstacleDetected: "true"
+
+    # ICP disabled for this RGB-D + IMU use-case unless needed.
+    ICP/Strategy: "0"

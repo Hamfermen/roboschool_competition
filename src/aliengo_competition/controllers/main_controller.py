@@ -68,11 +68,22 @@ class _CameraRenderer:
 
         cv2 = self._cv2
         depth_color = cv2.applyColorMap(depth_u8, cv2.COLORMAP_TURBO)
-        depth_color = cv2.resize(depth_color, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
+        depth_color = cv2.resize(
+            depth_color, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_NEAREST
+        )
         rgb_bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         view = np.concatenate((rgb_bgr, depth_color), axis=1)
 
-        cv2.putText(view, "RGB", (10, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.putText(
+            view,
+            "RGB",
+            (10, 26),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
         cv2.putText(
             view,
             f"Depth 0..{self.depth_max_m:.1f}m",
@@ -105,10 +116,14 @@ def run(
     robot.reset()
     env = getattr(robot, "env", None)
     if env is None:
-        raise ValueError("Интерфейс робота должен предоставлять 'env' для обязательного логирования.")
+        raise ValueError(
+            "Интерфейс робота должен предоставлять 'env' для обязательного логирования."
+        )
 
     logger = CompetitionRunLogger(env=env, seed=int(seed))
-    camera_renderer = _CameraRenderer(enabled=render_camera, depth_max_m=camera_depth_max_m)
+    camera_renderer = _CameraRenderer(
+        enabled=render_camera, depth_max_m=camera_depth_max_m
+    )
     control_dt = _infer_control_dt(robot, fallback_dt=0.02)
     requested_steps = max(int(steps), 1)
     nominal_dt = 0.02
@@ -119,7 +134,9 @@ def run(
         f"effective_steps={total_steps}"
     )
     object_queue = list(getattr(env, "SEQUENCE_OF_OBJECTS", []))
-    print(f"[Контроллер] отрисовка_камеры={'включена' if camera_renderer.enabled else 'выключена'}")
+    print(
+        f"[Контроллер] отрисовка_камеры={'включена' if camera_renderer.enabled else 'выключена'}"
+    )
     print(f"[Контроллер] object_queue={object_queue}")
 
     # Редактируемые пользователем блоки в этом файле:
@@ -127,17 +144,46 @@ def run(
     # 2. USER CONTROL LOGIC START / END
 
     # ================= USER PARAMETERS START =================
-    # Настраивайте эти значения, чтобы менять поведение демо.
-    # Параметры, завязанные на время, пересчитываются через шаг симуляции, потому время в секундах работают в симуляции правильно
-    warmup_s = 0.4
-    ramp_s = 1.2
+    import threading
+
+    import rclpy
+    from rclpy.executors import MultiThreadedExecutor
+    from tf2_ros import Buffer, TransformListener
+
+    from .cube_database import CubeDatabase
+    from .cube_detector import CubeDetector
+    from .task_manager import TaskManager
+
+    warmup_s = 0.0
+    ramp_s = 0.0
     trajectory_period_s = 8.0
-    forward_speed_mean = 0.40
-    forward_speed_amp = 0.35
-    lateral_speed_amp = 0.22
-    yaw_rate_amp = 0.75
-    yaw_rate_damping = 0.55
-    ang_vel_scale = 0.25
+    forward_speed_mean = 0.0
+    forward_speed_amp = 0.0
+    lateral_speed_amp = 0.0
+    yaw_rate_amp = 0.0
+    yaw_rate_damping = 0.0
+    ang_vel_scale = 1.0
+
+    if not rclpy.ok():
+        rclpy.init(args=None)
+
+    cube_detector_node = CubeDetector()
+    cube_database_node = CubeDatabase()
+    task_manager_node = TaskManager(cube_database_node)
+
+    main_tf_buffer = Buffer()
+    main_tf_listener = TransformListener(main_tf_buffer, task_manager_node)
+    _ = main_tf_listener
+
+    ros_executor = MultiThreadedExecutor(num_threads=4)
+    ros_executor.add_node(cube_detector_node)
+    ros_executor.add_node(cube_database_node)
+    ros_executor.add_node(task_manager_node)
+    task_update_timer = task_manager_node.create_timer(0.1, task_manager_node.update)
+    _ = task_update_timer
+
+    ros_spin_thread = threading.Thread(target=ros_executor.spin, daemon=True)
+    ros_spin_thread.start()
     # ================== USER PARAMETERS END ==================
 
     segment_start_t = 0.0
@@ -162,12 +208,16 @@ def run(
             # Камеру можно брать и из state, и напрямую через robot.get_camera().
             camera_payload = robot.get_camera()
             camera_state = state.camera
-            if (camera_state.rgb is None or camera_state.depth is None) and isinstance(camera_payload, dict):
+            if (camera_state.rgb is None or camera_state.depth is None) and isinstance(
+                camera_payload, dict
+            ):
                 camera_state = CameraState(
                     rgb=camera_payload.get("image"),
                     depth=camera_payload.get("depth"),
                 )
-            elif (camera_state.rgb is None or camera_state.depth is None) and isinstance(camera_payload, CameraState):
+            elif (
+                camera_state.rgb is None or camera_state.depth is None
+            ) and isinstance(camera_payload, CameraState):
                 camera_state = camera_payload
             camera_renderer.show(camera_state)
             omega_z = state.imu.wz / ang_vel_scale
@@ -202,10 +252,14 @@ def run(
             measured_wz = state.wz
             base_ang_vel = state.imu.angular_velocity_xyz
             base_lin_acc = np.zeros(3, dtype=np.float32)
-            camera_data = camera_payload if isinstance(camera_payload, dict) else {
-                "image": camera_state.rgb,
-                "depth": camera_state.depth,
-            }
+            camera_data = (
+                camera_payload
+                if isinstance(camera_payload, dict)
+                else {
+                    "image": camera_state.rgb,
+                    "depth": camera_state.depth,
+                }
+            )
 
             # Обязательная обвязка для логирования найденного объекта.
             # Использование:
@@ -239,21 +293,29 @@ def run(
             if detected_object_id is not None:
                 log_found_object(detected_object_id)
 
-            local_t = max(sim_t - segment_start_t, 0.0)
-            if local_t < warmup_s:
+            policy_state = {
+                "joint_names": list(joint_names),
+                "relative_dof_pos": np.asarray(relative_dof_pos, dtype=np.float32),
+                "dof_vel": np.asarray(dof_vel, dtype=np.float32),
+                "measured_vx": float(measured_vx),
+                "measured_vy": float(measured_vy),
+                "measured_wz": float(measured_wz),
+                "base_ang_vel": np.asarray(base_ang_vel, dtype=np.float32),
+                "base_lin_acc": np.asarray(base_lin_acc, dtype=np.float32),
+                "camera_rgb_available": camera_data.get("image") is not None,
+                "camera_depth_available": camera_data.get("depth") is not None,
+            }
+            _ = policy_state
+
+            desired_twist = task_manager_node.get_desired_twist()
+            if task_manager_node.is_finished():
                 vx = 0.0
                 vy = 0.0
                 vw = 0.0
             else:
-                motion_t = local_t - warmup_s
-                phase = 2.0 * math.pi * motion_t / max(trajectory_period_s, control_dt)
-                ramp = min(motion_t / max(ramp_s, control_dt), 1.0)
-
-                vx = ramp * (forward_speed_mean + forward_speed_amp * math.cos(phase))
-                vy = ramp * (lateral_speed_amp * math.sin(2.0 * phase))
-                yaw_ff = yaw_rate_amp * math.sin(phase + math.pi / 4.0)
-                vw = ramp * (yaw_ff - yaw_rate_damping * state.imu.wz / ang_vel_scale)
-                vw = max(min(vw, 1.0), -1.0)
+                vx = float(desired_twist.linear.x)
+                vy = float(desired_twist.linear.y)
+                vw = float(desired_twist.angular.z)
             # ================== USER CONTROL LOGIC END ==================
 
             robot.set_speed(vx, vy, vw)

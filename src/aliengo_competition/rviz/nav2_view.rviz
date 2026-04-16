@@ -1,0 +1,99 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Selection
+    Name: Selection
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane: XY
+      Plane Cell Count: 40
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Show Axes: false
+      Show Arrows: true
+    - Class: rviz_default_plugins/Map
+      Name: RTABMap Map
+      Enabled: true
+      Topic:
+        Value: /map
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Description Topic:
+        Value: /robot_description
+    - Class: rviz_default_plugins/Path
+      Name: Global Path
+      Enabled: true
+      Topic:
+        Value: /plan
+      Color: 0; 255; 0
+      Line Width: 0.05
+    - Class: rviz_default_plugins/Path
+      Name: Local Path
+      Enabled: true
+      Topic:
+        Value: /local_plan
+      Color: 255; 255; 0
+      Line Width: 0.05
+    - Class: rviz_default_plugins/PointCloud2
+      Name: RTABMap Cloud
+      Enabled: true
+      Topic:
+        Value: /rtabmap/cloud_map
+      Size (Pixels): 2
+      Color Transformer: FlatColor
+      Color: 200; 200; 255
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Detected Cubes
+      Enabled: true
+      Marker Topic:
+        Value: /detected_cubes
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Known Cubes
+      Enabled: true
+      Marker Topic:
+        Value: /known_cubes
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+    - Class: rviz_default_plugins/PublishPoint
+      Topic:
+        Value: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 16
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Pitch: 0.8
+      Yaw: 0.8
+Window Geometry:
+  Height: 1000
+  Width: 1600
